@@ -3326,7 +3326,7 @@ namespace LocoVoznjaSkener
 			public const int browser_actions_menu_view = 2131230758;
 			
 			// aapt resource value: 0x7F080027
-			public const int button1 = 2131230759;
+			public const int btnSnap = 2131230759;
 			
 			// aapt resource value: 0x7F080028
 			public const int buttonPanel = 2131230760;
