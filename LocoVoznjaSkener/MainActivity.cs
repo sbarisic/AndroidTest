@@ -21,13 +21,15 @@ using System.Threading;
 
 namespace LocoVoznjaSkener {
 	[Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true, ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize)]
-	public class MainActivity : AppCompatActivity, TextureView.ISurfaceTextureListener {
-		const int CAMERA_PERMISSION_REQUEST_CODE = 3;
-		const int STORAGE_PERMISSION_REQUEST_CODE = 4;
+	public class MainActivity : Activity, TextureView.ISurfaceTextureListener {
+		const int CAMERA_RC = 80;
+		const int STOR_READ_RC = 81;
+		const int STOR_WRITE_RC = 82;
 
 		TextureView texView;
 		TextView camLabel;
 		Button btnSnap;
+		ImageView centerRect;
 
 		public void OnSurfaceTextureAvailable(SurfaceTexture Surface, int Width, int Height) {
 			CamUtils.Start(Surface, Width, Height);
@@ -54,13 +56,15 @@ namespace LocoVoznjaSkener {
 			Xamarin.Essentials.Platform.Init(this, savedInstanceState);
 			SetContentView(Resource.Layout.CamLayout);
 
-			if (CheckSelfPermission(Manifest.Permission.ReadExternalStorage) != Permission.Granted || CheckSelfPermission(Manifest.Permission.WriteExternalStorage) != Permission.Granted)
-				RequestPermissions(new[] { Manifest.Permission.ReadExternalStorage, Manifest.Permission.WriteExternalStorage }, STORAGE_PERMISSION_REQUEST_CODE);
+			var UIOpts = SystemUiFlags.HideNavigation | SystemUiFlags.LayoutFullscreen | SystemUiFlags.Fullscreen | SystemUiFlags.ImmersiveSticky;
 
-			if (CheckSelfPermission(Manifest.Permission.Camera) != Permission.Granted) {
-				RequestPermissions(new[] { Manifest.Permission.Camera }, CAMERA_PERMISSION_REQUEST_CODE);
-			} else
+			if (Window != null && Window.DecorView != null)
+				Window.DecorView.SystemUiVisibility = (StatusBarVisibility)UIOpts;
+
+			if (Utils.RequestPermissions(this, Manifest.Permission.ReadExternalStorage, Manifest.Permission.WriteExternalStorage, Manifest.Permission.Camera))
 				StartCamera();
+
+			centerRect = FindViewById<ImageView>(Resource.Id.centerRect);
 
 			btnSnap = FindViewById<Button>(Resource.Id.btnSnap);
 			btnSnap.Click += OnSnap;
@@ -74,8 +78,11 @@ namespace LocoVoznjaSkener {
 			CamUtils.TakePicture(OnPicture);
 		}
 
-		void OnPicture(Bitmap Pic) {
-			ShowLabel("69000 km");
+		async Task OnPicture(byte[] PicData, Bitmap Pic) {
+			string FileName = SaveBitmap(Pic);
+
+			//ShowLabel("Running OCR");
+			ShowLabel(await Utils.OCR(FileName, ApplicationContext));
 		}
 
 		void ShowLabel(string Text) {
@@ -83,18 +90,18 @@ namespace LocoVoznjaSkener {
 			camLabel.Visibility = ViewStates.Visible;
 		}
 
-		void SaveBitmap(Bitmap bitmap) {
-			return;
+		string SaveBitmap(Bitmap BMap) {
+			string FolderPath = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
+			string FilePath = System.IO.Path.Combine(FolderPath, "ocr.png");
 
-			var sdCardPath = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
-			var filePath = System.IO.Path.Combine(sdCardPath, "yourImageName.png");
+			if (File.Exists(FilePath))
+				File.Delete(FilePath);
 
-			if (File.Exists(filePath))
-				File.Delete(filePath);
+			FileStream Stream = new FileStream(FilePath, FileMode.Create);
+			BMap.Compress(Bitmap.CompressFormat.Png, 100, Stream);
+			Stream.Close();
 
-			var stream = new FileStream(filePath, FileMode.Create);
-			bitmap.Compress(Bitmap.CompressFormat.Png, 100, stream);
-			stream.Close();
+			return FilePath;
 		}
 
 		void SwitchHorizontal() {
@@ -123,21 +130,15 @@ namespace LocoVoznjaSkener {
 			}
 		}
 
-		public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults) {
-			Xamarin.Essentials.Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+		public override void OnRequestPermissionsResult(int ReqCode, string[] Perms, [GeneratedEnum] Permission[] GrantResults) {
+			Xamarin.Essentials.Platform.OnRequestPermissionsResult(ReqCode, Perms, GrantResults);
 
-			switch (requestCode) {
-				case CAMERA_PERMISSION_REQUEST_CODE:
-					if (grantResults.Length > 0 && grantResults[0] == Permission.Granted)
-						StartCamera();
-
-					break;
-
-				default:
-					break;
+			for (int i = 0; i < Perms.Length; i++) {
+				if (Perms[i] == Manifest.Permission.Camera && GrantResults[i] == Permission.Granted)
+					StartCamera();
 			}
 
-			base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+			base.OnRequestPermissionsResult(ReqCode, Perms, GrantResults);
 		}
 
 		public override void OnConfigurationChanged(Configuration newConfig) {

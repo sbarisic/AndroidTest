@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Android.App;
 using Android.Content;
 using Android.Graphics;
@@ -18,6 +19,7 @@ using DDebug = System.Diagnostics.Debug;
 namespace LocoVoznjaSkener {
 	static class CamUtils {
 		static Camera Cam;
+		static int Orientation;
 
 		public static void Start(SurfaceTexture Surface, int Width, int Height) {
 			if (Cam == null)
@@ -33,6 +35,7 @@ namespace LocoVoznjaSkener {
 			Cam.SetPreviewTexture(Surface);
 			Cam.SetDisplayOrientation(90);
 			StartPreview();
+			SetVertical();
 		}
 
 		public static void StartPreview() {
@@ -50,23 +53,29 @@ namespace LocoVoznjaSkener {
 		}
 
 		public static void SetHorizontal() {
-			Cam.SetDisplayOrientation(0);
+			Cam.SetDisplayOrientation(Orientation = 0);
 		}
 
 		public static void SetVertical() {
-			Cam.SetDisplayOrientation(90);
+			Cam.SetDisplayOrientation(Orientation = 90);
 		}
 
-		public static void TakePicture(Action<Bitmap> OnPicture) {
+		public static int GetOrientation() {
+			return Orientation;
+		}
+
+		public static void TakePicture(PictureCallback.OnPictureFunc OnPicture) {
 			PictureCallback PCallback = new PictureCallback(OnPicture);
 			Cam.TakePicture(PCallback, null, PCallback);
 		}
 	}
 
 	class PictureCallback : Java.Lang.Object, Camera.IPictureCallback, Camera.IShutterCallback {
-		Action<Bitmap> OnPicture;
+		public delegate Task OnPictureFunc(byte[] Data, Bitmap Img);
 
-		public PictureCallback(Action<Bitmap> OnPicture) {
+		OnPictureFunc OnPicture;
+
+		public PictureCallback(OnPictureFunc OnPicture) {
 			this.OnPicture = OnPicture;
 		}
 
@@ -76,8 +85,10 @@ namespace LocoVoznjaSkener {
 			using (MemoryStream MS = new MemoryStream(Data)) {
 				MS.Seek(0, SeekOrigin.Begin);
 
-				Bitmap ImageBmp = BitmapFactory.DecodeByteArray(Data, 0, Data.Length);
-				OnPicture(ImageBmp);
+				//Bitmap ImageBmp = BitmapFactory.DecodeByteArray(Data, 0, Data.Length);
+				Bitmap ImageBmp = Utils.CropImage(Data, CamUtils.GetOrientation() == 0);
+
+				OnPicture(Data, ImageBmp);
 			}
 
 			CamUtils.StartPreview();
