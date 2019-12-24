@@ -1,7 +1,6 @@
 ﻿using System;
 using Android.App;
 using Android.OS;
-using Android.Support.V7.App;
 using Android.Runtime;
 using Android.Widget;
 using Android.Views;
@@ -16,6 +15,7 @@ using Android.Util;
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
+using Plugin.ImageEdit.Abstractions;
 //using System.Drawing;
 //using GBitmap = System.Drawing.Bitmap;
 
@@ -61,7 +61,16 @@ namespace LocoVoznjaSkener {
 			if (Window != null && Window.DecorView != null)
 				Window.DecorView.SystemUiVisibility = (StatusBarVisibility)UIOpts;
 
-			if (Utils.RequestPermissions(this, Manifest.Permission.ReadExternalStorage, Manifest.Permission.WriteExternalStorage, Manifest.Permission.Camera))
+			string[] Perms = new[] {
+					Manifest.Permission.ReadExternalStorage,
+					Manifest.Permission.WriteExternalStorage,
+					Manifest.Permission.Camera,
+					Manifest.Permission.Internet,
+					Manifest.Permission.AccessCoarseLocation,
+					Manifest.Permission.AccessFineLocation
+				};
+
+			if (Utils.RequestPermissions(this, Perms))
 				StartCamera();
 
 			centerRect = FindViewById<ImageView>(Resource.Id.centerRect);
@@ -78,30 +87,22 @@ namespace LocoVoznjaSkener {
 			CamUtils.TakePicture(OnPicture);
 		}
 
-		async Task OnPicture(byte[] PicData, Bitmap Pic) {
-			string FileName = SaveBitmap(Pic);
+		async Task OnPicture(IEditableImage Img) {
+			int W = Img.Width;
+			int H = Img.Height;
 
-			//ShowLabel("Running OCR");
-			ShowLabel(await Utils.OCR(FileName, ApplicationContext));
+			OCRData OCRData = await OCR.Detect(Img, ApplicationContext, (int)(W * 0.52f), (int)(H * 0.13f));
+			OCR.SaveDebug(OCRData);
+
+			if (OCRData.TryParseKM(out int KM)) {
+				ShowLabel(string.Format("S: {0} km", KM));
+			} else
+				ShowLabel(string.Format("F: {0}", OCRData.Text));
 		}
 
 		void ShowLabel(string Text) {
 			camLabel.Text = Text;
 			camLabel.Visibility = ViewStates.Visible;
-		}
-
-		string SaveBitmap(Bitmap BMap) {
-			string FolderPath = Android.OS.Environment.ExternalStorageDirectory.AbsolutePath;
-			string FilePath = System.IO.Path.Combine(FolderPath, "ocr.png");
-
-			if (File.Exists(FilePath))
-				File.Delete(FilePath);
-
-			FileStream Stream = new FileStream(FilePath, FileMode.Create);
-			BMap.Compress(Bitmap.CompressFormat.Png, 100, Stream);
-			Stream.Close();
-
-			return FilePath;
 		}
 
 		void SwitchHorizontal() {

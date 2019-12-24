@@ -13,6 +13,8 @@ using Android.OS;
 using Android.Runtime;
 using Android.Views;
 using Android.Widget;
+using Plugin.ImageEdit;
+using Plugin.ImageEdit.Abstractions;
 using Camera = Android.Hardware.Camera;
 using DDebug = System.Diagnostics.Debug;
 
@@ -71,7 +73,7 @@ namespace LocoVoznjaSkener {
 	}
 
 	class PictureCallback : Java.Lang.Object, Camera.IPictureCallback, Camera.IShutterCallback {
-		public delegate Task OnPictureFunc(byte[] Data, Bitmap Img);
+		public delegate Task OnPictureFunc(IEditableImage Img);
 
 		OnPictureFunc OnPicture;
 
@@ -82,15 +84,11 @@ namespace LocoVoznjaSkener {
 		public void OnPictureTaken(byte[] Data, Camera Cam) {
 			CamUtils.StopPreview();
 
-			using (MemoryStream MS = new MemoryStream(Data)) {
-				MS.Seek(0, SeekOrigin.Begin);
+			IEditableImage Img = CrossImageEdit.Current.CreateImage(Data);
+			if (CamUtils.GetOrientation() != 0)
+				Img = Img.Rotate(90);
 
-				//Bitmap ImageBmp = BitmapFactory.DecodeByteArray(Data, 0, Data.Length);
-				Bitmap ImageBmp = Utils.CropImage(Data, CamUtils.GetOrientation() == 0);
-
-				OnPicture(Data, ImageBmp);
-			}
-
+			OnPicture(Img);
 			CamUtils.StartPreview();
 		}
 
