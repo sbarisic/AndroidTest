@@ -23,11 +23,26 @@ namespace LocoVoznjaSkener {
 		static Camera Cam;
 		static int Orientation;
 
+		static int MaxZoom;
+		static float ZoomScaleNum;
+
+		public static float ZoomScale {
+			get {
+				return ZoomScaleNum;
+			}
+
+			set {
+				ZoomScaleNum = Math.Clamp(value, 0, 1);
+				Zoom((int)(ZoomScaleNum * MaxZoom));
+			}
+		}
+
 		public static void Start(SurfaceTexture Surface, int Width, int Height) {
 			if (Cam == null)
 				Cam = Camera.Open();
 
 			Camera.Parameters Parms = Cam.GetParameters();
+			MaxZoom = Parms.MaxZoom;
 
 			if (Parms.SupportedFocusModes.Contains(Camera.Parameters.FocusModeContinuousPicture)) {
 				Parms.FocusMode = Camera.Parameters.FocusModeContinuousPicture;
@@ -66,6 +81,14 @@ namespace LocoVoznjaSkener {
 			return Orientation;
 		}
 
+		public static void Zoom(int Z) {
+			Z = Math.Clamp(Z, 0, MaxZoom);
+
+			Camera.Parameters Parms = Cam.GetParameters();
+			Parms.Zoom = Z;
+			Cam.SetParameters(Parms);
+		}
+
 		public static void TakePicture(PictureCallback.OnPictureFunc OnPicture) {
 			PictureCallback PCallback = new PictureCallback(OnPicture);
 			Cam.TakePicture(PCallback, null, PCallback);
@@ -84,12 +107,15 @@ namespace LocoVoznjaSkener {
 		public void OnPictureTaken(byte[] Data, Camera Cam) {
 			CamUtils.StopPreview();
 
-			IEditableImage Img = CrossImageEdit.Current.CreateImage(Data);
-			if (CamUtils.GetOrientation() != 0)
-				Img = Img.Rotate(90);
+			Utils.NewThread(() => {
+				IEditableImage Img = CrossImageEdit.Current.CreateImage(Data);
+				CamUtils.StartPreview();
 
-			OnPicture(Img);
-			CamUtils.StartPreview();
+				if (CamUtils.GetOrientation() != 0)
+					Img = Img.Rotate(90);
+
+				OnPicture(Img).Wait();
+			});
 		}
 
 

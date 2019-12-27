@@ -1,53 +1,47 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<RelativeLayout
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
-	android:orientation="vertical"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	tools:gridSpec="1|8|#0093eeff|K:#ee8700ff:16,l:72,l:16,r|S:#83ee00ff:16,0,l:16,56,l:16,0,r">
+	android:padding="0dp">
 
-	<RelativeLayout
+	<TextureView
+		android:id="@+id/texView"
 		android:layout_width="match_parent"
-		android:layout_height="match_parent">
-
-		<TextureView
-			android:id="@+id/texView"
-			android:layout_width="match_parent"
-			android:layout_height="match_parent"/>
-
-		<ImageView
-			android:id="@+id/centerRect"
-			android:layout_width="300.0dp"
-			android:layout_height="100.0dp"
-			android:src="@drawable/rect"
-			android:layout_centerHorizontal="true"
-			android:layout_centerVertical="true"	/>
-
-		<Button
-			android:layout_width="70.0dp"
-			android:layout_height="70.0dp"
-			android:layout_marginBottom="15.0dp"
-			android:layout_marginRight="15.0dp"
-			android:layout_marginLeft="15.0dp"
-			android:layout_marginTop="15.0dp"
-			android:layout_alignParentBottom="true"
-			android:layout_centerHorizontal="true"
-			android:text="snap"
-			android:id="@+id/btnSnap"
-			android:background="@drawable/snapbtn"
+		android:layout_height="match_parent"
 		/>
 
-		<TextView
-			android:id="@+id/camLabel"
-			android:text="XXXXXX km"
-			android:textColor="@android:color/white"
-			android:textAppearance="?android:attr/textAppearanceLarge"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_centerHorizontal="true"
-			android:layout_above="@+id/centerRect"
-			/>
+	<ImageView
+		android:id="@+id/centerRect"
+		android:layout_width="300dp"
+		android:layout_height="100.0dp"
+		android:src="@drawable/rect"
+		android:layout_centerHorizontal="true"
+		android:layout_centerVertical="true"
+		/>
 
-	</RelativeLayout>
-</LinearLayout>
+	<Button
+		android:layout_width="70.0dp"
+		android:layout_height="70.0dp"
+		android:layout_marginBottom="15.0dp"
+		android:layout_marginRight="15.0dp"
+		android:layout_marginLeft="15.0dp"
+		android:layout_marginTop="15.0dp"
+		android:layout_alignParentBottom="true"
+		android:layout_centerHorizontal="true"
+		android:text="snap"
+		android:id="@+id/btnSnap"
+		android:background="@drawable/snapbtn"
+		/>
+
+	<TextView
+		android:id="@+id/camLabel"
+		android:text="XXXXXX km"
+		android:textColor="@android:color/white"
+		android:textAppearance="?android:attr/textAppearanceLarge"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_centerHorizontal="true"
+		android:layout_above="@+id/centerRect"
+		/>
+</RelativeLayout>

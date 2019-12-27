@@ -49,6 +49,14 @@ namespace LocoVoznjaSkener {
 			return DateTime.Now.ToString("yyyyMMdd_HHmmss");
 		}
 
+		public static void WriteLine(string Fmt, params object[] Args) {
+			DDebug.WriteLine(string.Format(Fmt, Args));
+		}
+
+		public static void WriteLine(string Msg) {
+			DDebug.WriteLine(Msg);
+		}
+
 		public static float Clamp(float Val, float Min, float Max) {
 			if (Val < Min)
 				return Min;
@@ -71,19 +79,10 @@ namespace LocoVoznjaSkener {
 			return T;
 		}
 
-		public static async Task<Address> ReverseGeocodeCurrentLocation(Context Ctx, double Lat, double Long) {
+		public static Address GetAddress(Context Ctx, double Lat, double Long) {
 			Geocoder GCoder = new Geocoder(Ctx);
-			IList<Address> AddrList = await GCoder.GetFromLocationAsync(Lat, Long, 10);
+			IList<Address> AddrList = GCoder.GetFromLocation(Lat, Long, 10);
 			return AddrList.FirstOrDefault();
-		}
-
-		public static bool GetLocation(out double Lat, out double Long) {
-			Lat = 0;
-			Long = 0;
-			
-
-
-			return false;
 		}
 
 		public static Bitmap Blur(Bitmap BMap, float Radius) {

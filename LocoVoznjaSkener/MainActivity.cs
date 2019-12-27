@@ -16,20 +16,26 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
 using Plugin.ImageEdit.Abstractions;
+using Android.Locations;
 //using System.Drawing;
 //using GBitmap = System.Drawing.Bitmap;
 
 namespace LocoVoznjaSkener {
 	[Activity(Label = "@string/app_name", Theme = "@style/AppTheme", MainLauncher = true, ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize)]
-	public class MainActivity : Activity, TextureView.ISurfaceTextureListener {
-		const int CAMERA_RC = 80;
-		const int STOR_READ_RC = 81;
-		const int STOR_WRITE_RC = 82;
+	public class MainActivity : Activity, TextureView.ISurfaceTextureListener, ILocationListener {
+		ScaleGestureDetector ScaleDetector;
+		GestureDetector GestureDetector;
+
+		ScaleHandler ScaleHandler;
+		GestureHandler GestureHandler;
 
 		TextureView texView;
 		TextView camLabel;
 		Button btnSnap;
 		ImageView centerRect;
+
+		bool DoBeginLocoVoznja;
+		int Kilometers;
 
 		public void OnSurfaceTextureAvailable(SurfaceTexture Surface, int Width, int Height) {
 			CamUtils.Start(Surface, Width, Height);
@@ -53,8 +59,10 @@ namespace LocoVoznjaSkener {
 
 		protected override void OnCreate(Bundle savedInstanceState) {
 			base.OnCreate(savedInstanceState);
-			Xamarin.Essentials.Platform.Init(this, savedInstanceState);
+			//Xamarin.Essentials.Platform.Init(this, savedInstanceState);
+
 			SetContentView(Resource.Layout.CamLayout);
+			DoBeginLocoVoznja = false;
 
 			var UIOpts = SystemUiFlags.HideNavigation | SystemUiFlags.LayoutFullscreen | SystemUiFlags.Fullscreen | SystemUiFlags.ImmersiveSticky;
 
@@ -79,15 +87,23 @@ namespace LocoVoznjaSkener {
 			btnSnap.Click += OnSnap;
 
 			camLabel = FindViewById<TextView>(Resource.Id.camLabel);
-			camLabel.Visibility = ViewStates.Gone;
+			ShowLabel(null);
+
+			ScaleHandler = new ScaleHandler();
+			ScaleDetector = new ScaleGestureDetector(this, ScaleHandler);
+
+			GestureHandler = new GestureHandler();
+			GestureDetector = new GestureDetector(this, GestureHandler);
 		}
 
 		private void OnSnap(object sender, EventArgs e) {
-			ShowLabel("Processing...");
+			ShowLabel("Snapping...");
 			CamUtils.TakePicture(OnPicture);
 		}
 
 		async Task OnPicture(IEditableImage Img) {
+			ShowLabel("Processing...");
+
 			int W = Img.Width;
 			int H = Img.Height;
 
@@ -95,14 +111,58 @@ namespace LocoVoznjaSkener {
 			OCR.SaveDebug(OCRData);
 
 			if (OCRData.TryParseKM(out int KM)) {
-				ShowLabel(string.Format("S: {0} km", KM));
-			} else
-				ShowLabel(string.Format("F: {0}", OCRData.Text));
+				string KMFormat = string.Format("{0} km", KM);
+				ShowLabel(KMFormat);
+
+				RunOnUiThread(() => {
+					AlertDialog.Builder AlertBuilder = new AlertDialog.Builder(this);
+					AlertBuilder.SetTitle("Success");
+					AlertBuilder.SetMessage("Use the following? " + KMFormat);
+					AlertBuilder.SetPositiveButton("Yes", (S, E) => {
+						RunOnUiThread(() => {
+							ShowLabel("Fetching location...");
+
+							Kilometers = KM;
+							DoBeginLocoVoznja = true;
+
+							LocationManager LocMgr = (LocationManager)GetSystemService(LocationService);
+							LocMgr.RequestSingleUpdate(LocationManager.GpsProvider, this, Looper.MainLooper);
+						});
+					});
+
+					AlertBuilder.SetNegativeButton("No", (S, E) => {
+						ShowLabel("User cancelled");
+					});
+
+					AlertBuilder.Show();
+				});
+
+			} else {
+				ShowLabel(null);
+				ShowInfoDialog("Info", string.Format("Failed to parse km, got '{0}'", OCRData.Text ?? "none"));
+			}
+		}
+
+		void ShowInfoDialog(string Title, string Text) {
+			RunOnUiThread(() => {
+				AlertDialog.Builder AlertBuilder = new AlertDialog.Builder(this);
+
+				AlertBuilder.SetTitle(Title);
+				AlertBuilder.SetMessage(Text);
+				AlertBuilder.SetPositiveButton("OK", (S, E) => { });
+
+				AlertBuilder.Show();
+			});
 		}
 
 		void ShowLabel(string Text) {
-			camLabel.Text = Text;
-			camLabel.Visibility = ViewStates.Visible;
+			RunOnUiThread(() => {
+				if (!string.IsNullOrEmpty(Text)) {
+					camLabel.Text = Text;
+					camLabel.Visibility = ViewStates.Visible;
+				} else
+					camLabel.Visibility = ViewStates.Gone;
+			});
 		}
 
 		void SwitchHorizontal() {
@@ -132,7 +192,7 @@ namespace LocoVoznjaSkener {
 		}
 
 		public override void OnRequestPermissionsResult(int ReqCode, string[] Perms, [GeneratedEnum] Permission[] GrantResults) {
-			Xamarin.Essentials.Platform.OnRequestPermissionsResult(ReqCode, Perms, GrantResults);
+			//Xamarin.Essentials.Platform.OnRequestPermissionsResult(ReqCode, Perms, GrantResults);
 
 			for (int i = 0; i < Perms.Length; i++) {
 				if (Perms[i] == Manifest.Permission.Camera && GrantResults[i] == Permission.Granted)
@@ -149,6 +209,46 @@ namespace LocoVoznjaSkener {
 				SwitchVertical();
 			else if (newConfig.Orientation == Android.Content.Res.Orientation.Landscape)
 				SwitchHorizontal();
+		}
+
+		public override bool OnTouchEvent(MotionEvent e) {
+			ScaleDetector.OnTouchEvent(e);
+			GestureDetector.OnTouchEvent(e);
+			return base.OnTouchEvent(e);
+		}
+
+		public void OnLocationChanged(Location Loc) {
+			if (DoBeginLocoVoznja) {
+				DoBeginLocoVoznja = false;
+				ShowLabel("Starting...");
+
+				Address StartAddr = Utils.GetAddress(this, Loc.Latitude, Loc.Longitude);
+				LocoVoznja.BeginLocoVoznja(Kilometers, StartAddr);
+			}
+		}
+
+		public void OnProviderDisabled(string provider) {
+		}
+
+		public void OnProviderEnabled(string provider) {
+		}
+
+		public void OnStatusChanged(string provider, [GeneratedEnum] Availability status, Bundle extras) {
+		}
+	}
+
+	class GestureHandler : GestureDetector.SimpleOnGestureListener {
+		public override bool OnDoubleTap(MotionEvent E) {
+			CamUtils.ZoomScale = 0;
+			return true;
+		}
+	}
+
+	class ScaleHandler : ScaleGestureDetector.SimpleOnScaleGestureListener {
+		public override bool OnScale(ScaleGestureDetector Det) {
+			float ZoomAmt = ((float)Math.Round(Det.ScaleFactor, 2) - 1.0f) / 4.0f;
+			CamUtils.ZoomScale = CamUtils.ZoomScale + ZoomAmt;
+			return true;
 		}
 	}
 }
